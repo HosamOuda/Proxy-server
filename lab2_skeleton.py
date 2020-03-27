@@ -4,6 +4,7 @@ import os
 import enum
 import socket
 
+
 class HttpRequestInfo(object):
     """
     Represents a HTTP request information
@@ -31,12 +32,24 @@ class HttpRequestInfo(object):
     NOTE: you need to implement to_http_string() for this class.
     """
 
-    def __init__(self, client_info, method: str, requested_host: str,requested_port: int,requested_path: str,headers: list):
+    def __init__(
+        self,
+        client_info,
+        method: str,
+        requested_host: str,
+        requested_port: int,
+        requested_path: str,
+        headers: list,
+    ):
         self.method = method
-        self.client_address_info = client_info
-        self.requested_host = requested_host
-        self.requested_port = requested_port
-        self.requested_path = requested_path
+        self.client_address_info = (
+            client_info  # ip address and port ......client_addr = ("127.0.0.1", 9877)
+        )
+        self.requested_host = (
+            requested_host  # l site ely ana 3yzo mn 8er l port --> url
+        )
+        self.requested_port = requested_port  # port of website       default 80
+        self.requested_path = requested_path  # facebook/...    hya el /...
         # Headers will be represented as a list of tuples
         # for example ("Host", "www.google.com")
         # if you get a header as:
@@ -112,6 +125,7 @@ class HttpRequestState(enum.Enum):
 
     Leave this as is, feel free to add yours.
     """
+
     INVALID_INPUT = 0
     NOT_SUPPORTED = 1
     GOOD = 2
@@ -127,7 +141,7 @@ def entry_point(proxy_port_number):
     inside it.
     """
 
-    my_proxy_socket=setup_sockets(proxy_port_number)
+    my_proxy_socket = setup_sockets(proxy_port_number)
     print("*" * 50)
     print("[entry_point] Implement me!")
     print("*" * 50)
@@ -151,7 +165,7 @@ def setup_sockets(proxy_port_number):
     print("*" * 50)
     sck_client_to_proxy = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     # Bind the socket to the port
-    server_address = ('127.0.0.1', proxy_port_number)
+    server_address = ("127.0.0.1", proxy_port_number)
     print("starting up on {} port {}".format(*server_address))
     # Set timeout
     sck_client_to_proxy.settimeout(0.1)
@@ -177,7 +191,7 @@ def do_socket_logic():
     pass
 
 
-def http_request_pipeline(source_addr, http_raw_data): #get user input 
+def http_request_pipeline(source_addr, http_raw_data):  # get user input
     """
     HTTP request processing pipeline.
 
@@ -214,22 +228,46 @@ def parse_http_request(source_addr, http_raw_data) -> HttpRequestInfo:
     print("[parse_http_request] Implement me!")
     print("*" * 50)
     # Replace this line with the correct values.
+    my_command = get_arg(4, source_addr.split(" ")[0])
+    my_url = get_arg(5, source_addr.split(" ")[1])
+    my_version = get_arg(6, source_addr.split(" ")[2])
+
     ret = HttpRequestInfo(None, None, None, None, None, None)
+    validity_flag = check_http_request_validity(
+        ret, my_command, my_url, http_raw_data, my_version
+    )
+    if validity_flag == HttpRequestState.GOOD:
+        ret = HttpRequestInfo(my_command, None, None, None, None, None)
     return ret
 
 
-def check_http_request_validity(http_request_info: HttpRequestInfo) -> HttpRequestState:
+def check_http_request_validity(
+    http_request_info: HttpRequestInfo, my_command, my_url, http_raw_data, my_version
+) -> HttpRequestState:
     """
     Checks if an HTTP response is valid
 
     returns:
     One of values in HttpRequestState
     """
-    print("*" * 50)
-    print("[check_http_request_validity] Implement me!")
-    print("*" * 50)
+    flag = 0
+
+    if my_command.casefold() != "get":
+        flag = 1
+        return HttpRequestState.NOT_SUPPORTED
+
+    import re
+
+    my_protocol = re.findall(r"^\w+", my_url)
+    if my_protocol.casefold() != "http":
+        if not http_raw_data:
+            return HttpRequestState.INVALID_INPUT
+
+    if my_version.casefold() != "HTTP/1.0":
+        return HttpRequestState.NOT_SUPPORTED
+
     # return HttpRequestState.GOOD (for example)
-    return HttpRequestState.PLACEHOLDER
+    return HttpRequestState.GOOD
 
 
 def sanitize_http_request(request_info: HttpRequestInfo) -> HttpRequestInfo:
@@ -247,6 +285,7 @@ def sanitize_http_request(request_info: HttpRequestInfo) -> HttpRequestInfo:
     print("*" * 50)
     ret = HttpRequestInfo(None, None, None, None, None, None)
     return ret
+
 
 #######################################
 # Leave the code below as is.
@@ -268,9 +307,8 @@ def get_arg(param_index, default=None):
             return default
         else:
             print(e)
-            print(
-                f"[FATAL] The comand-line argument #[{param_index}] is missing")
-            exit(-1)    # Program execution failed.
+            print(f"[FATAL] The comand-line argument #[{param_index}] is missing")
+            exit(-1)  # Program execution failed.
 
 
 def check_file_name():
@@ -283,6 +321,7 @@ def check_file_name():
     """
     script_name = os.path.basename(__file__)
     import re
+
     matches = re.findall(r"(\d{4}_){2}lab2\.py", script_name)
     if not matches:
         print(f"[WARN] File name is invalid [{script_name}]")
@@ -295,7 +334,7 @@ def main():
     To add code that uses sockets, feel free to add functions
     above main and outside the classes.
     """
-    
+    my_input = input("Enter your command: ")
     print("\n\n")
     print("*" * 50)
     print(f"[LOG] Printing command line arguments [{', '.join(sys.argv)}]")
@@ -304,7 +343,22 @@ def main():
 
     # This argument is optional, defaults to 18888
     proxy_port_number = get_arg(1, 18888)
+    # new_line_Counter=my_input.count('\n') #count number of /n in the input string
+    # space_r_counter=my_input.count('\r')  #count number of /r in the input string
+
+    # print("new_line_Counter",new_line_Counter)
+    # print("space_r_counter",space_r_counter)
+    my_input.replace("\n", ".")
+    my_input.replace("\r", ".")
+
+    print("USER INPUT IS", my_input)
+    my_input_list = my_input.split(" ")
+    source_Addr = "127.0.0.1 69"
+    # print("my splitted line","*",entire_command,"*",commnad_headers)
+
+    # print("iam here","*",my_command,"*",my_url,"*",my_version)
     entry_point(proxy_port_number)
+    http_request_pipeline(source_Addr, my_input_list)
 
 
 if __name__ == "__main__":
