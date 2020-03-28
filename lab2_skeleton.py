@@ -132,7 +132,7 @@ class HttpRequestState(enum.Enum):
     PLACEHOLDER = -1
 
 
-def entry_point(proxy_port_number):
+def entry_point(proxy_port_number, my_input):
     """
     Entry point, start your code here.
 
@@ -145,6 +145,8 @@ def entry_point(proxy_port_number):
     print("*" * 50)
     print("[entry_point] Implement me!")
     print("*" * 50)
+    source_Addr = "127.0.0.1 69"
+    http_request_pipeline(source_Addr, my_input)
     return None
 
 
@@ -228,16 +230,16 @@ def parse_http_request(source_addr, http_raw_data) -> HttpRequestInfo:
     print("[parse_http_request] Implement me!")
     print("*" * 50)
     # Replace this line with the correct values.
-    my_command = get_arg(4, source_addr.split(" ")[0])
-    my_url = get_arg(5, source_addr.split(" ")[1])
-    my_version = get_arg(6, source_addr.split(" ")[2])
+    http_raw_data = http_raw_data.replace(r"\r", " ")
 
-    ret = HttpRequestInfo(None, None, None, None, None, None)
-    validity_flag = check_http_request_validity(
-        ret, my_command, my_url, http_raw_data, my_version
-    )
-    if validity_flag == HttpRequestState.GOOD:
-        ret = HttpRequestInfo(my_command, None, None, None, None, None)
+    my_input_list = http_raw_data.split(r"\n")
+    print("here is my list ", my_input_list)
+    my_command = get_arg(4, my_input_list[0].split(" ")[0])
+    my_url = get_arg(5, my_input_list[0].split(" ")[1])
+    my_version = get_arg(6, my_input_list[0].split(" ")[2])
+
+    ret = HttpRequestInfo(my_command, source_addr, my_url, None, None, None)
+
     return ret
 
 
@@ -259,7 +261,7 @@ def check_http_request_validity(
     import re
 
     my_protocol = re.findall(r"^\w+", my_url)
-    if my_protocol.casefold() != "http":
+    if my_protocol.casefold() != "www":
         if not http_raw_data:
             return HttpRequestState.INVALID_INPUT
 
@@ -348,17 +350,11 @@ def main():
 
     # print("new_line_Counter",new_line_Counter)
     # print("space_r_counter",space_r_counter)
-    my_input.replace("\n", ".")
-    my_input.replace("\r", ".")
 
-    print("USER INPUT IS", my_input)
-    my_input_list = my_input.split(" ")
-    source_Addr = "127.0.0.1 69"
     # print("my splitted line","*",entire_command,"*",commnad_headers)
 
     # print("iam here","*",my_command,"*",my_url,"*",my_version)
-    entry_point(proxy_port_number)
-    http_request_pipeline(source_Addr, my_input_list)
+    entry_point(proxy_port_number, my_input)
 
 
 if __name__ == "__main__":
