@@ -1,4 +1,3 @@
-# Don't forget to change this file's name before submission.
 import sys
 import os
 import enum
@@ -132,65 +131,42 @@ class HttpRequestState(enum.Enum):
     PLACEHOLDER = -1
 
 
-def entry_point(proxy_port_number, my_input):
-    """
-    Entry point, start your code here.
+def entry_point(proxy_port_number):
 
-    Please don't delete this function,
-    but feel free to modify the code
-    inside it.
-    """
-
-    my_proxy_socket = setup_sockets(proxy_port_number)
     print("*" * 50)
     print("[entry_point] Implement me!")
     print("*" * 50)
-    source_Addr = "127.0.0.1 69"
-    http_request_pipeline(source_Addr, my_input)
+    socketObj = setup_sockets(proxy_port_number)
+    # source_Addr = "127.0.0.1 69"
+    clientAddr, request = recieveClientRequest(socketObj)
+    http_request_pipeline(clientAddr, request)
+
     return None
 
 
 def setup_sockets(proxy_port_number):
-    """
-    Socket logic MUST NOT be written in the any
-    class. Classes know nothing about the sockets.
 
-    But feel free to add your own classes/functions.
-
-    Feel free to delete this function.
-    """
     print("Starting HTTP proxy on port:", proxy_port_number)
 
     # when calling socket.listen() pass a number
     # that's larger than 10 to avoid rejecting
     # connections automatically.
+
     print("*" * 50)
-    sck_client_to_proxy = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sck_client_to_proxy = socket.socket()
     # Bind the socket to the port
-    server_address = ("127.0.0.1", proxy_port_number)
-    print("starting up on {} port {}".format(*server_address))
-    # Set timeout
-    sck_client_to_proxy.settimeout(0.1)
-    ###########################################################################################
-    """sck_proxy_to_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    # Bind the socket to the port
-    server_address = ('localhost', proxy_port_number)
-    print('starting up on {} port {}'.format(*server_address))
-    sck.bind(server_address)
-    sck.settimeout(0.1)
-    print("*" * 50)
-    """
+    sck_client_to_proxy.bind(("127.0.0.1", proxy_port_number))
+    sck_client_to_proxy.listen(10)
     return sck_client_to_proxy
 
 
-def do_socket_logic():
-    """
-    Example function for some helper logic, in case you
-    want to be tidy and avoid stuffing the main function.
+# Socket Functions
+def recieveClientRequest(socket):
 
-    Feel free to delete this function.
-    """
-    pass
+    clientSocket, clientAddr = socket.accept()
+    request = clientSocket.recv(1024)
+    print(request.decode("utf-8"))
+    return clientAddr, request
 
 
 def http_request_pipeline(source_addr, http_raw_data):  # get user input
@@ -336,7 +312,7 @@ def main():
     To add code that uses sockets, feel free to add functions
     above main and outside the classes.
     """
-    my_input = input("Enter your command: ")
+    # my_input = input("Enter your command: ")
     print("\n\n")
     print("*" * 50)
     print(f"[LOG] Printing command line arguments [{', '.join(sys.argv)}]")
@@ -354,7 +330,7 @@ def main():
     # print("my splitted line","*",entire_command,"*",commnad_headers)
 
     # print("iam here","*",my_command,"*",my_url,"*",my_version)
-    entry_point(proxy_port_number, my_input)
+    entry_point(18888)
 
 
 if __name__ == "__main__":
