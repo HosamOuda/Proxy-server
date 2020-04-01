@@ -137,7 +137,6 @@ class HttpRequestState(enum.Enum):
 def entry_point(proxy_port_number):
 
     print("*" * 50)
-    print("[entry_point] Implement me!")
     print("*" * 50)
     # Intialize CTP Socket
     clientSocket = setup_CTP_sockets(proxy_port_number)
@@ -146,14 +145,12 @@ def entry_point(proxy_port_number):
 
     print("client addr : ", clientAddr)
     print("Client request : ", request)
-    get www.get
-    get google.com
-    get hhtp
+
     # Test Requests
     # request = ""
     # End Of testing
 
-    serverRequest = http_request_pipeline(clientAddr, request)
+    serverRequest = http_request_pipeline(clientAddr, "GET / HTTP/1.0\r\nHost: www.google.edu\r\n\r\n")
 
 
     serverRequest.display()
@@ -228,7 +225,12 @@ def SendtoClient(my_socket, ClientAddr, Data):
     my_socket.sendto(Data, ClientAddr)
 
 
-# http request parsing functions
+def message_coding_Switcher(argument):
+    switcher = {
+        HttpRequestState.INVALID_INPUT:400,
+        HttpRequestState.INVALID_INPUT:501,
+    }
+    return switcher.get(argument, "Invalid message")
 
 
 def http_request_pipeline(clientAddr, request):  # get user input
@@ -257,8 +259,9 @@ def http_request_pipeline(clientAddr, request):  # get user input
 
     if validation_Flag == HttpRequestState.GOOD:
         my_http_obj = parse_http_request(clientAddr, my_request_list)
-    #   else:
-    #       my_Error_obj=HttpErrorResponse(type of error 404 or 501 discuss it with ashry ,validation_Flag)
+    else:
+        my_error_code=message_coding_Switcher(validation_Flag)
+        my_Error_obj=HttpErrorResponse(my_error_code ,validation_Flag)
 
     # Validate, sanitize, return Http object.
     
@@ -288,13 +291,12 @@ def parse_http_request(clientAddr, my_request_list) -> HttpRequestInfo:
     my_headers = my_request_list[1:]
     print("my headers in Parse http request: ", my_headers)
 
-    if my_url.startswith("/"):  # if we get get http://www.google.com/ then call sanitize to remove everything before / and put in the host & add in the validation the http check and www check and .com check (or)
-        my_url, my_headers = sanitize_http_request(my_request_list, my_url)
+    if my_url.startswith("/")==False:  #not a path 
+
+        my_path,my_host, my_headers = sanitize_http_request(my_request_list, my_url)
             # dont forget class error response and the hashmap
     my_version = my_instruction.split(" ")[2]
-    ret = HttpRequestInfo(
-        clientAddr, my_command, path,host, 80, my_headers
-    )  ## eh howa l port number
+    ret = HttpRequestInfo(clientAddr, my_command, my_path,my_host, 80, my_headers) 
 
     return ret
 
@@ -310,23 +312,22 @@ def check_http_request_validity(http_request_info: HttpRequestInfo, my_request):
 
     print("my request list in VALIDATION", my_request_list)
 
-    if len(my_request_list[0].split(" ")) < 3:  # a field in command
-        print("Problem in 0")
+    if len(my_request_list[0].split(" ")) < 3:  #  field missing  
         return HttpRequestState.INVALID_INPUT, my_request_list
 
     else:
         my_command = get_arg(4, my_request_list[0].split(" ")[0])
         my_url = get_arg(5, my_request_list[0].split(" ")[1])
         my_version = get_arg(6, my_request_list[0].split(" ")[2])
-        print("version : ", my_version)
+
+        
         if my_command.casefold() != "get":
             return HttpRequestState.NOT_SUPPORTED, my_request_list
 
-        if (
-            "http" in my_url == False
-            or my_url.find("http") != 0
-            or my_url.startswith("/")
-        ):
+        if (my_url.startswith("/")):
+            
+            # if it is a path 
+            
             if len(my_request_list) < 2:  # mean no header
                 return HttpRequestState.INVALID_INPUT, my_request_list
             elif (
@@ -334,13 +335,24 @@ def check_http_request_validity(http_request_info: HttpRequestInfo, my_request):
             ):  # means no host
                 return HttpRequestState.INVALID_INPUT, my_request_list
 
+
+        if ( "www.".casefold() in my_url == False 
+            or my_url.find("www.".casefold()) != 0 
+            or "http".casefold() in my_url == False 
+            or my_url.find("http".casefold()) != 0
+            or my_url.find(".com".casefold())==False):
+            # if we dont have http or http is not in the begining 
+            # if we dont have www. or www. is not in the beginings
+            # if we dont have .com 
+            return HttpRequestState.INVALID_INPUT, my_request_list
+
         if my_version == "HTTP/1.1" or my_version == "HTTP/1.0":
             return HttpRequestState.GOOD, my_request_list
         else:
             return HttpRequestState.NOT_SUPPORTED, my_request_list
 
 
-def sanitize_http_request(my_request_list, my_path) -> HttpRequestInfo:
+def sanitize_http_request(my_request_list, my_url) -> HttpRequestInfo:
     """
     Puts an HTTP request on the sanitized (standard form)
 
@@ -353,17 +365,22 @@ def sanitize_http_request(my_request_list, my_path) -> HttpRequestInfo:
     find = r"\r"
     replace = ""
     text = re.sub(find, replace, my_request_list[1]).rstrip()
-
-    my_headers = re.split("; |, |\*|\n", text)
+    my_headers = re.split("; |, |\*|\n", text) # all my headers 
     my_host_index = my_headers.index("Host:".casefold())
-    my_site = my_headers[my_host_index].split("Host:", 1)[1]
+    
 
+    my_site=my_url[:(my_url.index(".com")+4)]
+    my_path=my_url.split(".com:".casefold(), 1)[1] # extract the path from google.com/.....
+    
+    
     if not my_site.startswith("www."):
-        my_full_url = "www." + my_site + my_path
+        my_headers[my_host_index]="Host:"+"www."+my_site
+        my_host=my_headers[my_host_index]
     else:
-        my_full_url = my_site + my_path
+        my_headers[my_host_index]="Host:"+my_site
+        my_host=my_headers[my_host_index]
 
-    return my_full_url, my_headers
+    return my_path,my_host,my_headers
 
 
 #######################################
