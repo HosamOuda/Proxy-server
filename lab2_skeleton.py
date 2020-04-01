@@ -2,6 +2,7 @@ import sys
 import os
 import enum
 import socket
+import re
 
 
 class HttpRequestInfo(object):
@@ -35,9 +36,9 @@ class HttpRequestInfo(object):
         self,
         client_info,
         method: str,
-        requested_host: str,
-        requested_port: int,
         requested_path: str,
+        requested_host: str, 
+        requested_port: int,
         headers: list,
     ):
         self.method = method
@@ -73,38 +74,40 @@ class HttpRequestInfo(object):
         keeping it as a string in this stage is to ease
         debugging and testing.
         """
-
+        request_line = self.method + " " + self.requested_path + " HTTTP/1.0\r\n"
+        Headers = "\r\n".join(self.headers)
+        HttpStringRequest = request_line + Headers
         print("*" * 50)
         print("[to_http_string] Implement me!")
         print("*" * 50)
-        return None
+        return HttpStringRequest
 
     def to_byte_array(self, http_string):
-        """
-        Converts an HTTP string to a byte array.
-        """
         return bytes(http_string, "UTF-8")
 
     def display(self):
         print(f"Client:", self.client_address_info)
         print(f"Method:", self.method)
+        print(f"Path:", self.requested_path)
         print(f"Host:", self.requested_host)
         print(f"Port:", self.requested_port)
-        stringified = [": ".join([k, v]) for (k, v) in self.headers]
-        print("Headers:\n", "\n".join(stringified))
+        print("Headers:\n", self.headers)
 
 
 class HttpErrorResponse(object):
     """
     Represents a proxy-error-response.
     """
+    #Unsupported method
+    #Relatie path with No host
 
     def __init__(self, code, message):
+
         self.code = code
         self.message = message
 
     def to_http_string(self):
-        """ Same as above """
+        "Error"+self.code+","+self.message
         pass
 
     def to_byte_array(self, http_string):
@@ -136,40 +139,99 @@ def entry_point(proxy_port_number):
     print("*" * 50)
     print("[entry_point] Implement me!")
     print("*" * 50)
-    socketObj = setup_sockets(proxy_port_number)
-    # source_Addr = "127.0.0.1 69"
-    clientAddr, request = recieveClientRequest(socketObj)
-    http_request_pipeline(clientAddr, request)
+    # Intialize CTP Socket
+    clientSocket = setup_CTP_sockets(proxy_port_number)
+    # Rec Client Request
+    clsocket, clientAddr, request = recieveClientRequest(clientSocket)
 
+    print("client addr : ", clientAddr)
+    print("Client request : ", request)
+    get www.get
+    get google.com
+    get hhtp
+    # Test Requests
+    # request = ""
+    # End Of testing
+
+    serverRequest = http_request_pipeline(clientAddr, request)
+
+
+    serverRequest.display()
+
+    http_request_string = serverRequest.to_http_string()
+    print("HttpStringRequest : ", http_request_string)
+
+    http_request = serverRequest.to_byte_array(http_request_string)
+    print("Encoded request", http_request)
+
+    serverSocket = setup_PTS_socket()
+    DataPacket = SendHttpRequestANDrecvData(
+        serverSocket, serverRequest.requested_host, http_request
+    )
+    serverSocket.close()
+
+    clsocket.sendto(DataPacket, clientAddr)
     return None
 
 
-def setup_sockets(proxy_port_number):
+# Setting up Sockets
+
+
+def setup_CTP_sockets(proxy_port_number):
 
     print("Starting HTTP proxy on port:", proxy_port_number)
+    print("*" * 50)
 
-    # when calling socket.listen() pass a number
-    # that's larger than 10 to avoid rejecting
-    # connections automatically.
+    Socket = socket.socket()
+    Socket.bind(("127.0.0.1", proxy_port_number))
+    Socket.listen(10)
+    return Socket
+
+
+def setup_PTS_socket():
 
     print("*" * 50)
-    sck_client_to_proxy = socket.socket()
-    # Bind the socket to the port
-    sck_client_to_proxy.bind(("127.0.0.1", proxy_port_number))
-    sck_client_to_proxy.listen(10)
-    return sck_client_to_proxy
+    sck = socket.socket()
+    return sck
 
 
 # Socket Functions
-def recieveClientRequest(socket):
-
-    clientSocket, clientAddr = socket.accept()
+def recieveClientRequest(my_socket):
+    print("*" * 50)
+    print("recieveClientRequest")
+    print("*" * 50)
+    clientSocket, clientAddr = my_socket.accept()
     request = clientSocket.recv(1024)
-    print(request.decode("utf-8"))
-    return clientAddr, request
+
+    return clientSocket, clientAddr, request.decode("utf-8")
 
 
-def http_request_pipeline(source_addr, http_raw_data):  # get user input
+def SendHttpRequestANDrecvData(my_socket, host_name, http_request):
+    print("*" * 50)
+    print("SendHttpRequestANDrecvData")
+    print("*" * 50)
+    # print("Host name : ", host_name)
+    # server_ip = socket.gethostbyname(host_name)
+    # Testing The function
+    server_ip = socket.gethostbyname("www.google.com")
+    http_request = b"GET / HTTP/1.0\r\nHost: www.google.com\r\n\r\n"
+    # End of Testing
+    my_socket.connect((server_ip, 80))
+    my_socket.sendto(http_request, (server_ip, 80))
+    packet = my_socket.recv(4096)
+    print("Packet rec : ", packet)
+    return packet
+
+
+def SendtoClient(my_socket, ClientAddr, Data):
+    print("Clie : ", ClientAddr)
+    my_socket.sendto(Data, ClientAddr)
+
+
+# http request parsing functions
+
+
+def http_request_pipeline(clientAddr, request):  # get user input
     """
     HTTP request processing pipeline.
 
@@ -185,70 +247,100 @@ def http_request_pipeline(source_addr, http_raw_data):  # get user input
     Please don't remove this function, but feel
     free to change its content
     """
+
+    
+
     # Parse HTTP request
-    parsed = parse_http_request(source_addr, http_raw_data)
+    my_http_obj = HttpRequestInfo(None, None, None, None, None, None)
+
+    validation_Flag, my_request_list = check_http_request_validity(my_http_obj, request)
+
+    if validation_Flag == HttpRequestState.GOOD:
+        my_http_obj = parse_http_request(clientAddr, my_request_list)
+    #   else:
+    #       my_Error_obj=HttpErrorResponse(type of error 404 or 501 discuss it with ashry ,validation_Flag)
 
     # Validate, sanitize, return Http object.
-    print("*" * 50)
-    print("[http_request_pipeline] Implement me!")
-    print("*" * 50)
-    return None
+    
+    #b"GET / HTTP/1.0\r\nHost: www.google.com\r\n\r\n"
+    #print(method) GET
+    #print(path) /
+    #print(host) www.google.com
+    
+    return my_http_obj
 
 
-def parse_http_request(source_addr, http_raw_data) -> HttpRequestInfo:
+def parse_http_request(clientAddr, my_request_list) -> HttpRequestInfo:
     """
     This function parses an HTTP request into an HttpRequestInfo
     object.
 
     it does NOT validate the HTTP request.
     """
-    print("*" * 50)
-    print("[parse_http_request] Implement me!")
-    print("*" * 50)
+    print("My Request list in parse : ", my_request_list)
+
     # Replace this line with the correct values.
-    http_raw_data = http_raw_data.replace(r"\r", " ")
+    my_instruction = my_request_list[0]
 
-    my_input_list = http_raw_data.split(r"\n")
-    print("here is my list ", my_input_list)
-    my_command = get_arg(4, my_input_list[0].split(" ")[0])
-    my_url = get_arg(5, my_input_list[0].split(" ")[1])
-    my_version = get_arg(6, my_input_list[0].split(" ")[2])
+    my_command = my_instruction.split(" ")[0]
 
-    ret = HttpRequestInfo(my_command, source_addr, my_url, None, None, None)
+    my_url = my_instruction.split(" ")[1]
+    my_headers = my_request_list[1:]
+    print("my headers in Parse http request: ", my_headers)
+
+    if my_url.startswith("/"):  # if we get get http://www.google.com/ then call sanitize to remove everything before / and put in the host & add in the validation the http check and www check and .com check (or)
+        my_url, my_headers = sanitize_http_request(my_request_list, my_url)
+            # dont forget class error response and the hashmap
+    my_version = my_instruction.split(" ")[2]
+    ret = HttpRequestInfo(
+        clientAddr, my_command, path,host, 80, my_headers
+    )  ## eh howa l port number
 
     return ret
 
 
-def check_http_request_validity(
-    http_request_info: HttpRequestInfo, my_command, my_url, http_raw_data, my_version
-) -> HttpRequestState:
+def check_http_request_validity(http_request_info: HttpRequestInfo, my_request):
     """
     Checks if an HTTP response is valid
 
     returns:
     One of values in HttpRequestState
     """
-    flag = 0
+    my_request_list = my_request.split("\r\n")
 
-    if my_command.casefold() != "get":
-        flag = 1
-        return HttpRequestState.NOT_SUPPORTED
+    print("my request list in VALIDATION", my_request_list)
 
-    import re
+    if len(my_request_list[0].split(" ")) < 3:  # a field in command
+        print("Problem in 0")
+        return HttpRequestState.INVALID_INPUT, my_request_list
 
-    my_protocol = re.findall(r"^\w+", my_url)
-    if my_protocol.casefold() != "www":
-        if not http_raw_data:
-            return HttpRequestState.INVALID_INPUT
+    else:
+        my_command = get_arg(4, my_request_list[0].split(" ")[0])
+        my_url = get_arg(5, my_request_list[0].split(" ")[1])
+        my_version = get_arg(6, my_request_list[0].split(" ")[2])
+        print("version : ", my_version)
+        if my_command.casefold() != "get":
+            return HttpRequestState.NOT_SUPPORTED, my_request_list
 
-    if my_version.casefold() != "HTTP/1.0":
-        return HttpRequestState.NOT_SUPPORTED
+        if (
+            "http" in my_url == False
+            or my_url.find("http") != 0
+            or my_url.startswith("/")
+        ):
+            if len(my_request_list) < 2:  # mean no header
+                return HttpRequestState.INVALID_INPUT, my_request_list
+            elif (
+                any("Host:".casefold() in i for i in my_request_list) == False
+            ):  # means no host
+                return HttpRequestState.INVALID_INPUT, my_request_list
 
-    # return HttpRequestState.GOOD (for example)
-    return HttpRequestState.GOOD
+        if my_version == "HTTP/1.1" or my_version == "HTTP/1.0":
+            return HttpRequestState.GOOD, my_request_list
+        else:
+            return HttpRequestState.NOT_SUPPORTED, my_request_list
 
 
-def sanitize_http_request(request_info: HttpRequestInfo) -> HttpRequestInfo:
+def sanitize_http_request(my_request_list, my_path) -> HttpRequestInfo:
     """
     Puts an HTTP request on the sanitized (standard form)
 
@@ -258,11 +350,20 @@ def sanitize_http_request(request_info: HttpRequestInfo) -> HttpRequestInfo:
 
     for example, expand a URL to relative path + Host header.
     """
-    print("*" * 50)
-    print("[sanitize_http_request] Implement me!")
-    print("*" * 50)
-    ret = HttpRequestInfo(None, None, None, None, None, None)
-    return ret
+    find = r"\r"
+    replace = ""
+    text = re.sub(find, replace, my_request_list[1]).rstrip()
+
+    my_headers = re.split("; |, |\*|\n", text)
+    my_host_index = my_headers.index("Host:".casefold())
+    my_site = my_headers[my_host_index].split("Host:", 1)[1]
+
+    if not my_site.startswith("www."):
+        my_full_url = "www." + my_site + my_path
+    else:
+        my_full_url = my_site + my_path
+
+    return my_full_url, my_headers
 
 
 #######################################
