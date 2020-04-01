@@ -37,7 +37,7 @@ class HttpRequestInfo(object):
         client_info,
         method: str,
         requested_path: str,
-        requested_host: str, 
+        requested_host: str,
         requested_port: int,
         headers: list,
     ):
@@ -57,6 +57,7 @@ class HttpRequestInfo(object):
         # convert it to ("Host", "www.google.com") note that the
         # port is removed (because it goes into the request_port variable)
         self.headers = headers
+        
 
     def to_http_string(self):
         """
@@ -94,12 +95,14 @@ class HttpRequestInfo(object):
         print("Headers:\n", self.headers)
 
 
+
 class HttpErrorResponse(object):
     """
     Represents a proxy-error-response.
     """
-    #Unsupported method
-    #Relatie path with No host
+
+    # Unsupported method
+    # Relatie path with No host
 
     def __init__(self, code, message):
 
@@ -107,7 +110,7 @@ class HttpErrorResponse(object):
         self.message = message
 
     def to_http_string(self):
-        "Error"+self.code+","+self.message
+        "Error" + self.code + "," + self.message
         pass
 
     def to_byte_array(self, http_string):
@@ -150,9 +153,9 @@ def entry_point(proxy_port_number):
     # request = ""
     # End Of testing
 
-    serverRequest = http_request_pipeline(clientAddr, "GET / HTTP/1.0\r\nHost: www.google.edu\r\n\r\n")
+    serverRequest = http_request_pipeline(clientAddr, request)
 
-
+    print("*********************************")
     serverRequest.display()
 
     http_request_string = serverRequest.to_http_string()
@@ -169,7 +172,20 @@ def entry_point(proxy_port_number):
 
     clsocket.sendto(DataPacket, clientAddr)
     return None
+def cache (my_packet):
+    Dict={}
+    Dict = dict({my_packet}) 
+    """
+    ASHRY LMA 3YZ TDWR FEEHA 3NDK L CODE DA MN STACKOVERFLOW
 
+    dictionary = {'george': 16, 'amber': 19}
+    search_age = input("Provide age")
+    for name, age in dictionary.items(): 
+        if age == search_age:
+            print(name)
+
+    """   
+    return Dict
 
 # Setting up Sockets
 
@@ -227,8 +243,8 @@ def SendtoClient(my_socket, ClientAddr, Data):
 
 def message_coding_Switcher(argument):
     switcher = {
-        HttpRequestState.INVALID_INPUT:400,
-        HttpRequestState.INVALID_INPUT:501,
+        HttpRequestState.INVALID_INPUT: 400,
+        HttpRequestState.INVALID_INPUT: 501,
     }
     return switcher.get(argument, "Invalid message")
 
@@ -250,26 +266,26 @@ def http_request_pipeline(clientAddr, request):  # get user input
     free to change its content
     """
 
-    
-
     # Parse HTTP request
     my_http_obj = HttpRequestInfo(None, None, None, None, None, None)
 
     validation_Flag, my_request_list = check_http_request_validity(my_http_obj, request)
-
+    print("my validation flag", validation_Flag)
     if validation_Flag == HttpRequestState.GOOD:
+        print("GOOD")
         my_http_obj = parse_http_request(clientAddr, my_request_list)
     else:
-        my_error_code=message_coding_Switcher(validation_Flag)
-        my_Error_obj=HttpErrorResponse(my_error_code ,validation_Flag)
+        print("BAD")
+        my_error_code = message_coding_Switcher(validation_Flag)
+        my_Error_obj = HttpErrorResponse(my_error_code, validation_Flag)
 
     # Validate, sanitize, return Http object.
-    
-    #b"GET / HTTP/1.0\r\nHost: www.google.com\r\n\r\n"
-    #print(method) GET
-    #print(path) /
-    #print(host) www.google.com
-    
+
+    # b"GET / HTTP/1.0\r\nHost: www.google.com\r\n\r\n"
+    # print(method) GET
+    # print(path) /
+    # print(host) www.google.com
+
     return my_http_obj
 
 
@@ -290,13 +306,13 @@ def parse_http_request(clientAddr, my_request_list) -> HttpRequestInfo:
     my_url = my_instruction.split(" ")[1]
     my_headers = my_request_list[1:]
     print("my headers in Parse http request: ", my_headers)
+    print("url in parse : ", my_url)
+    if my_url.startswith("/") == False:  # not a path
 
-    if my_url.startswith("/")==False:  #not a path 
-
-        my_path,my_host, my_headers = sanitize_http_request(my_request_list, my_url)
-            # dont forget class error response and the hashmap
+        my_path, my_host, my_headers = sanitize_http_request(my_request_list, my_url)
+        # dont forget class error response and the hashmap
     my_version = my_instruction.split(" ")[2]
-    ret = HttpRequestInfo(clientAddr, my_command, my_path,my_host, 80, my_headers) 
+    ret = HttpRequestInfo(clientAddr, my_command, my_path, my_host, 80, my_headers)
 
     return ret
 
@@ -312,7 +328,7 @@ def check_http_request_validity(http_request_info: HttpRequestInfo, my_request):
 
     print("my request list in VALIDATION", my_request_list)
 
-    if len(my_request_list[0].split(" ")) < 3:  #  field missing  
+    if len(my_request_list[0].split(" ")) < 3:  #  field missing
         return HttpRequestState.INVALID_INPUT, my_request_list
 
     else:
@@ -320,14 +336,13 @@ def check_http_request_validity(http_request_info: HttpRequestInfo, my_request):
         my_url = get_arg(5, my_request_list[0].split(" ")[1])
         my_version = get_arg(6, my_request_list[0].split(" ")[2])
 
-        
         if my_command.casefold() != "get":
             return HttpRequestState.NOT_SUPPORTED, my_request_list
 
-        if (my_url.startswith("/")):
-            
-            # if it is a path 
-            
+        if my_url.startswith("/"):
+
+            # if it is a path
+
             if len(my_request_list) < 2:  # mean no header
                 return HttpRequestState.INVALID_INPUT, my_request_list
             elif (
@@ -335,16 +350,15 @@ def check_http_request_validity(http_request_info: HttpRequestInfo, my_request):
             ):  # means no host
                 return HttpRequestState.INVALID_INPUT, my_request_list
 
+        if ".com".casefold() in my_url == False:
 
-        if ( "www.".casefold() in my_url == False 
-            or my_url.find("www.".casefold()) != 0 
-            or "http".casefold() in my_url == False 
-            or my_url.find("http".casefold()) != 0
-            or my_url.find(".com".casefold())==False):
-            # if we dont have http or http is not in the begining 
-            # if we dont have www. or www. is not in the beginings
-            # if we dont have .com 
             return HttpRequestState.INVALID_INPUT, my_request_list
+        else:
+            return HttpRequestState.GOOD, my_request_list
+
+            # if we dont have http or http is not in the begining
+            # if we dont have www. or www. is not in the beginings
+            # if we dont have .com
 
         if my_version == "HTTP/1.1" or my_version == "HTTP/1.0":
             return HttpRequestState.GOOD, my_request_list
@@ -362,25 +376,48 @@ def sanitize_http_request(my_request_list, my_url) -> HttpRequestInfo:
 
     for example, expand a URL to relative path + Host header.
     """
-    find = r"\r"
-    replace = ""
-    text = re.sub(find, replace, my_request_list[1]).rstrip()
-    my_headers = re.split("; |, |\*|\n", text) # all my headers 
-    my_host_index = my_headers.index("Host:".casefold())
-    
+    print("request list in sanitize : ", my_request_list)
+    print("my_url in sanitize : ", my_url)
 
-    my_site=my_url[:(my_url.index(".com")+4)]
-    my_path=my_url.split(".com:".casefold(), 1)[1] # extract the path from google.com/.....
-    
-    
-    if not my_site.startswith("www."):
-        my_headers[my_host_index]="Host:"+"www."+my_site
-        my_host=my_headers[my_host_index]
+    my_headers = my_request_list[1:]  # all my headers
+    if "Host:" in my_headers:
+        my_host_index = my_headers.index("Host:".casefold())
+        my_site = my_url[: (my_url.index(".com") + 3)]
+        print("my site in sanitiza : ", my_site)
+        my_path = my_url.split(".com:".casefold(), 1)[1]  # extract the path from google.com/.....
+        print("my path in sanitiza : ", my_path)
+        if my_site.startswith("http://".casefold()):
+            my_site = my_site.partition("http://")[2].strip()
+            if my_site.startswith("www.".casefold()):
+                my_site = my_site.partition("www.")[2].strip()
+                my_headers[my_host_index] = "Host:" +  my_site
+                my_host = my_headers[my_host_index]
+            else:
+                my_headers[my_host_index] = "Host:" +  my_site
+                my_host = my_headers[my_host_index]
+        elif my_site.startswith("www.".casefold()):
+            my_site = my_site.partition("www.")[2].strip()
+            my_headers[my_host_index] = "Host:" +  my_site
+            my_host = my_headers[my_host_index]  
+
     else:
-        my_headers[my_host_index]="Host:"+my_site
-        my_host=my_headers[my_host_index]
-
-    return my_path,my_host,my_headers
+        if my_site.startswith("http://".casefold()):
+            my_site = my_site.partition("http://")[2].strip()
+            if my_site.startswith("www.".casefold()):
+                my_site = my_site.partition("www.")[2].strip()
+                my_host= "Host:" +  my_site
+                my_headers.append(my_host)
+                
+            else:
+                my_headers[my_host_index] = "Host:" +  my_site
+                my_host = my_headers[my_host_index]
+                my_headers.append(my_host)
+        elif my_site.startswith("www.".casefold()):
+            my_site = my_site.partition("www.")[2].strip()
+            my_host= "Host:" +  my_site
+            my_headers.append(my_host)
+            
+    return my_path, my_host, my_headers
 
 
 #######################################
