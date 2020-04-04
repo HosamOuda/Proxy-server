@@ -14,9 +14,9 @@ class HttpRequestInfo(object):
         self,
         client_info,
         method: str,
-        requested_path: str,
         requested_host: str,
         requested_port: int,
+        requested_path: str,
         headers: list,
     ):
         self.client_address_info = client_info
@@ -27,12 +27,18 @@ class HttpRequestInfo(object):
         self.headers = headers
 
     def to_http_string(self):
+        my_list = []
+        for H in self.headers:
+            my_list.append(H[0] + ": " + H[1])
+        my_list.append("")
+        my_list.append("")
+        self.headers.clear()
+        self.headers = my_list.copy()
 
         Headers = "\r\n".join(self.headers)
         HttpStringRequest = (
             self.method + " " + self.requested_path + " HTTP/1.0\r\n" + Headers
         )
-
         return HttpStringRequest
 
     def to_byte_array(self, HttpStringRequest):
@@ -132,6 +138,7 @@ def ServeClientRequest(clientSocket, clientAddr, Cache):
     request = recieveClientRequest(clientSocket)
     # Get Http request object
     serverRequest = http_request_pipeline(clientAddr, request)
+
     if serverRequest.getType():  # Valid Request
 
         # Check if the packet in the cache
@@ -142,7 +149,6 @@ def ServeClientRequest(clientSocket, clientAddr, Cache):
             # Get Request to remote server Packet
 
             http_request = serverRequest.getRequestPacket()
-
             # Open Socket between proxy and remote servers
             serverSocket = setup_PTS_socket()
             # Send Request and rec packet(S)
@@ -236,8 +242,11 @@ def SendRequestANDrecvData(my_socket, host_name, my_port, http_request):
 
 
 def SendtoClient(my_socket, ClientAddr, Data):
-    for packet in Data:
-        my_socket.sendto(packet, ClientAddr)
+    if type(Data) == list:
+        for packet in Data:
+            my_socket.sendto(packet, ClientAddr)
+    else:
+        my_socket.sendto(Data, ClientAddr)
 
 
 def message_coding_Switcher(argument):
@@ -278,7 +287,6 @@ def http_request_pipeline(clientAddr, request):
     else:
         my_error_code = message_coding_Switcher(validation_Flag)
         http_obj = HttpErrorResponse(my_error_code, validation_Flag.name)
-
     return http_obj
 
 
@@ -294,7 +302,6 @@ def parse_http_request(clientAddr, my_request) -> HttpRequestInfo:
 
     my_instruction = my_request_list[0]
     my_headers = my_request_list[1:]
-
     my_command = my_instruction.split(" ")[0]
     my_url = my_instruction.split(" ")[1]
 
@@ -312,15 +319,23 @@ def parse_http_request(clientAddr, my_request) -> HttpRequestInfo:
         for i, s in enumerate(my_headers):
             if "Host: " in s:
                 my_host = s.split(":")[1].strip()
-                my_headers[i] = my_host
+                my_headers[i] = "Host: " + my_host
                 try:
                     my_port = s.split(":")[2]
                 except:
                     pass
                 break
 
-    ret = HttpRequestInfo(clientAddr, my_command, my_path, my_host, my_port, my_headers)
+    my_appended_list = []
 
+    for s in my_headers:
+        if s != "":
+            l = s.split(":")
+            my_appended_list.append([i.strip(" ") for i in l])
+
+    ret = HttpRequestInfo(
+        clientAddr, my_command, my_host, my_port, my_path, my_appended_list
+    )
     return ret
 
 
@@ -334,7 +349,6 @@ def check_http_request_validity(my_request):
     my_request_list = my_request.split("\r\n")
     filter_object = filter(lambda x: x != "", my_request_list)
     my_request_list = list(filter_object)
-
     command_Regx = re.compile("[a-z]{3,4} [\a-z]{1,} [\a-z]{3,}")
 
     if (
@@ -344,8 +358,6 @@ def check_http_request_validity(my_request):
         return HttpRequestState.INVALID_INPUT
 
     else:
-
-        header_Regx = re.compile("[a-z]{4,}:[\a-z]{3,}")  # host:......  cookie:fdsf
         if (
             not my_request_list[0].split(" ")[0].strip()
             or not my_request_list[0].split(" ")[1].strip()
@@ -357,6 +369,21 @@ def check_http_request_validity(my_request):
             my_url = get_arg(5, my_request_list[0].split(" ")[1]).strip()  # http:////
             my_version = get_arg(6, my_request_list[0].split(" ")[2]).strip()
 
+            # Validaite Headers
+            print("Command", my_command)
+            Flag = 0
+            print
+            for s in my_request_list[1:]:
+
+                try:
+                    Hls = s.split(":")
+                    if len(Hls[0]) > 3 and len(Hls[1]) > 3:
+                        Flag = 1
+                except:
+                    return HttpRequestState.INVALID_INPUT
+                if Flag != 1:
+                    return HttpRequestState.INVALID_INPUT
+
             if my_url.startswith("/"):
                 my_host_index = -1
                 for i, s in enumerate(my_request_list):
@@ -364,10 +391,7 @@ def check_http_request_validity(my_request):
                         my_host_index = i
                         break
 
-                if (
-                    my_host_index == -1
-                    or header_Regx.match(my_request_list[1].lower()) == False
-                ):  # mean no header
+                if my_host_index == -1:
                     return HttpRequestState.INVALID_INPUT
 
             if my_version.lower() not in ["http/1.1", "http/1.0"] == True:
@@ -399,6 +423,7 @@ def sanitize_http_request(my_request_list, my_url) -> HttpRequestInfo:
     # Port + Path
     AfterSite = my_url.split(".com".casefold())[1]
     # check If port exists in Url
+
     try:
         # Extract port and path
         AfterSite = AfterSite.split(":".casefold())[1]
@@ -416,7 +441,7 @@ def sanitize_http_request(my_request_list, my_url) -> HttpRequestInfo:
             my_path = "/"
 
     my_host_index = -1
-    # Testing
+
     for i, s in enumerate(my_headers):
         if "Host" in s:
             my_host_index = i
